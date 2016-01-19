@@ -1334,7 +1334,7 @@
   (define existing-readline?
     (look-for "load readline support[^\r\n]*" "(require readline/rep)"))
   (define (yes? question)
-    (define qtext (string->bytes/utf-8 (format "; ~a? " question)))
+    (define qtext (string->bytes/utf-8 (format "; ~a? (yes/no) " question)))
     (define inp
       (case (object-name (current-input-port))
         [(readline-input)
