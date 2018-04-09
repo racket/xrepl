@@ -114,8 +114,8 @@
     ;; "~/..." path.
     (if (not (complete-path? x)) ; shouldn't happen
       x
-      (let* ([r (path->string (find-relative-path (current-directory) x))]
-             [h (path->string (let ([p (find-relative-path home-dir x)])
+      (let* ([r (path->string (find-relative-path (current-directory) (string->path x)))]
+             [h (path->string (let ([p (find-relative-path home-dir (string->path x))])
                                 ;; On Windows, HOME might be on a different
                                 ;; volume, so make sure we get a relative
                                 ;; path back:
