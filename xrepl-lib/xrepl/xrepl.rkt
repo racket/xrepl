@@ -1609,7 +1609,10 @@
       (orig str exn)
       (let* ([s (get-output-string (current-error-port))]
              [s (regexp-replace* #rx"^\n+|\n+$" s "")]
-             [s (regexp-replace* #rx"\n\n+" s "\n")])
+             [s (regexp-replace* #rx"\n\n+" s "\n")]
+             [s (if (equal? str s)
+                    (string-append s "\n(no backtrace)")
+                    s)])
         ;; temporary hack: this is always on since it shows all fields,
         ;; so ",bt" is now really a generic "more info"
         (and ; (not (equal? str s))
