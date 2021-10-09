@@ -11,3 +11,6 @@
 (define pkg-desc "tests for \"xrepl\"")
 
 (define pkg-authors '(eli))
+
+(define license
+  '(Apache-2.0 OR MIT))

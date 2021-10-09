@@ -19,3 +19,6 @@
 (define pkg-desc "documentation part of \"xrepl\"")
 
 (define pkg-authors '(eli))
+
+(define license
+  '(Apache-2.0 OR MIT))
