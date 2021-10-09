@@ -10,3 +10,6 @@
 (define pkg-desc "Console-oriented extended REPL for Racket")
 
 (define pkg-authors '(eli))
+
+(define license
+  '(Apache-2.0 OR MIT))
