@@ -2,7 +2,7 @@
 
 (define collection 'multi)
 
-(define deps '("base"
+(define deps '(["base" #:version "8.3.0.2"]
                "readline-lib"
                "scribble-text-lib"))
 

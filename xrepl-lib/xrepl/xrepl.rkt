@@ -14,7 +14,9 @@
 
 ;; ----------------------------------------------------------------------------
 
-(require racket/dict racket/list racket/match scribble/text/wrap)
+(require racket/dict racket/list racket/match scribble/text/wrap
+         racket/file racket/interaction-info
+         (only-in '#%boot default-current-read-interaction?))
 
 ;; ----------------------------------------------------------------------------
 ;; utilities
@@ -1544,6 +1546,12 @@
     (display prefix) (display "> ") (flush-output) (zero-column!)
     (let ([in ((current-get-interaction-input-port))])
       ((current-read-interaction) (object-name in) in)))
+  (define expeditor-open ; no direct dependency on expeditor
+    (and (or (current-interaction-info)
+             (default-current-read-interaction?))
+         (with-handlers ([exn? (λ (_) #f)])
+           (collection-file-path "main.rkt" "expeditor"))
+         (dynamic-require 'expeditor 'expeditor-open (lambda () #f))))
   (define RL ; no direct dependency on readline
     (with-handlers ([exn? (λ (_) #f)])
       (collection-file-path "pread.rkt" "readline")))
@@ -1554,30 +1562,49 @@
         (parameterize ([p (bytes-append (string->bytes/locale prefix) (p))])
           (r)))))
   (define reader
-    (case (object-name (current-input-port))
-      [(stdin)
-       (if (or (not (terminal-port? (current-input-port)))
-               (eq? 'windows (system-type))
-               (regexp-match? #rx"^dumb" (or (getenv "TERM") ""))
-               (not RL))
-         plain-reader
-         (with-handlers ([exn?
-                          (λ (e)
-                            (eprintf "; Warning: no readline support (~a)\n"
-                                     (exn-message e))
-                            plain-reader)])
-           (dynamic-require 'readline/rep-start #f)
-           ;; requiring readline should have changed the reader
-           (if (eq? (current-prompt-read)
-                    (dynamic-require RL 'read-cmdline-syntax))
-             (make-readline-reader)
-             (begin (eprintf "; Warning: could not initialize readline\n")
-                    plain-reader))))]
-      [(readline-input)
-       (eprintf "; Note: readline already loaded\n~a\n"
-                ";   (better to let xrepl load it for you)")
-       (make-readline-reader)]
-      [else plain-reader]))
+    (cond
+      [(and expeditor-open
+            (expeditor-open
+             (map bytes->string/utf-8
+                  (get-preference 'readline-input-history (lambda () null)))))
+       => (lambda (ee)
+            (define (ex sym) (dynamic-require 'expeditor sym))
+            (define expeditor-read (ex 'expeditor-read))
+            (define expeditor-close (ex 'expeditor-close))
+            ((ex 'expeditor-configure))
+            (exit-handler
+             (let ([old (exit-handler)])
+               (lambda (v)
+                 (define history (expeditor-close ee))
+                 (put-preferences '(readline-input-history) (list (map string->bytes/utf-8 history)))
+                 (old v))))
+            (lambda (prefix)
+              (expeditor-read ee)))]
+      [else
+       (case (object-name (current-input-port))
+         [(stdin)
+          (if (or (not (terminal-port? (current-input-port)))
+                  (eq? 'windows (system-type))
+                  (regexp-match? #rx"^dumb" (or (getenv "TERM") ""))
+                  (not RL))
+              plain-reader
+              (with-handlers ([exn?
+                               (λ (e)
+                                 (eprintf "; Warning: no readline support (~a)\n"
+                                          (exn-message e))
+                                 plain-reader)])
+                (dynamic-require 'readline/rep-start #f)
+                ;; requiring readline should have changed the reader
+                (if (eq? (current-prompt-read)
+                         (dynamic-require RL 'read-cmdline-syntax))
+                    (make-readline-reader)
+                    (begin (eprintf "; Warning: could not initialize readline\n")
+                           plain-reader))))]
+         [(readline-input)
+          (eprintf "; Note: readline already loaded\n~a\n"
+                   ";   (better to let xrepl load it for you)")
+          (make-readline-reader)]
+         [else plain-reader])]))
   ;; IO management
   (port-count-lines! (current-input-port))
   ;; wrap the reader to get the command functionality
