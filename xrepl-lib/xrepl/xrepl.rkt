@@ -235,7 +235,9 @@
 ;; ----------------------------------------------------------------------------
 
 (define current-parse-done-escape (make-parameter void))
+(define current-parse-check-no-more (make-parameter void))
 (define current-command-input (make-parameter (current-input-port)))
+(define current-error-display (make-parameter #f))
 
 ;; ----------------------------------------------------------------------------
 ;; toplevel "," commands management
@@ -375,10 +377,12 @@
         [(module)  (translate (loop 'sexpr) process-module)]
         [else (error 'getarg "unknown arg kind: ~e" kind)]))
     (when last?
-      ((current-parse-done-escape)))))
+      ((current-parse-done-escape))
+      ((current-parse-check-no-more)))))
 
 (define (noarg)
-  ((current-parse-done-escape)))
+  ((current-parse-done-escape))
+  ((current-parse-check-no-more)))
 
 (define (run-command cmd #:handle-exn? [handle-exn? #f])
   (parameterize ([current-command cmd])
@@ -893,9 +897,13 @@
   "see a backtrace of the last exception"
   ["Display the last exception with its backtrace."]
   (noarg)
-  (printf "; ~a\n"
-          (regexp-replace* #rx"\n+" (or last-backtrace "(no backtrace)")
-                           "\n; ")))
+  (if (current-error-display)
+      ((current-error-display) (string-append
+                                (or last-backtrace "(no backtrace)")
+                                "\n"))
+      (printf "; ~a\n"
+              (regexp-replace* #rx"\n+" (or last-backtrace "(no backtrace)")
+                               "\n; "))))
 
 (defcommand (exn) "[id]"
   "see the previous exception"
@@ -1615,6 +1623,7 @@
             (define expeditor-read (ex 'expeditor-read))
             (define expeditor-close (ex 'expeditor-close))
             (define current-expeditor-ready-checker (ex 'current-expeditor-ready-checker))
+            (current-error-display (ex 'expeditor-error-display))
             ((ex 'expeditor-configure))
             (exit-handler
              (let ([old (exit-handler)])
@@ -1728,7 +1737,12 @@
          (reader-loop)]
         [(xrepl-command-and-argument-port? input)
          (finish-command
-          (parameterize ([current-command-input (xrepl-command-and-argument-port-in input)])
+          (parameterize ([current-command-input (xrepl-command-and-argument-port-in input)]
+                         [current-parse-done-escape (lambda ()
+                                                      (skip-spaces/peek)
+                                                      (define s (read-string 32 (current-command-input)))
+                                                      (unless (eof-object? s)
+                                                        (error 'xrepl "unexpected command argument at: ~.a" s)))])
             (run-command (xrepl-command-and-argument-port-cmd input))))]
         [else
          (extract-cmd
@@ -1744,7 +1758,7 @@
   reader-loop)
 
 (define (xrepl-command-input? in)
-  (regexp-match-peek #px"\\s*," in))
+  (regexp-match-peek #px"^\\s*," in))
 
 (define (extract-cmd v-in k)
   (define v (if (syntax? v-in) (syntax->datum v-in) v-in))
@@ -1769,23 +1783,32 @@
              [s (if (equal? str s)
                     (string-append s "\n(no backtrace)")
                     s)])
-        ;; temporary hack: this is always on since it shows all fields,
+        ;; this is always on since it shows all fields,
         ;; so ",bt" is now really a generic "more info"
-        (and ; (not (equal? str s))
-         (begin (set! last-backtrace s)
-                (set! last-exn exn)
-                #t)))))
+        (begin (set! last-backtrace s)
+               (set! last-exn exn)
+               #t))))
   (define msg "[,bt for context]")
   (parameterize ([current-output-port (current-error-port)])
     (let* ([s (regexp-replace* #rx"^\n+|\n+$" str "")]
            [s (regexp-replace* #rx"\n\n+" s "\n")]
            [s (regexp-replace* #rx"\n  [^\n]+\\.\\.\\.:(?:[^\n]+|\n   )+" s "")]
-           [s (regexp-replace* #rx"\n" s "\n; ")]
+           [s (if (current-error-display)
+                  s
+                  (regexp-replace* #rx"\n" s "\n; "))]
            [s (if backtrace?
-                (string-append s (if (regexp-match? #rx"\n" s) "\n; " " ") msg)
-                s)])
+                  (string-append s
+                                 (if (regexp-match? #rx"\n" s)
+                                     (if (current-error-display)
+                                         "\n "
+                                         "\n; ")
+                                     " ")
+                                 msg)
+                  s)])
       (fresh-line #t)
-      (with-wrapped-output (printf "; ~a\n" s)))))
+      (if (current-error-display)
+          ((current-error-display) (string-append s "\n"))
+          (with-wrapped-output (printf "; ~a\n" s))))))
 
 ;; ----------------------------------------------------------------------------
 ;; set up the xrepl environment
