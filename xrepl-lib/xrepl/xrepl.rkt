@@ -238,6 +238,7 @@
 (define current-parse-check-no-more (make-parameter void))
 (define current-command-input (make-parameter (current-input-port)))
 (define current-error-display (make-parameter #f))
+(define current-newline-ends-command (make-parameter #t))
 
 ;; ----------------------------------------------------------------------------
 ;; toplevel "," commands management
@@ -313,7 +314,7 @@
   (define (get read)
     (define (get-one)
       (cond [(eq? read read-line-arg) (read (current-command-input))]
-            [(eq? #\newline (skip-spaces/peek)) eof]
+            [(and (current-newline-ends-command) (eq? #\newline (skip-spaces/peek))) eof]
             [else (read (current-command-input))]))
     (define (get-list)
       (let ([x (get-one)]) (if (eof-object? x) '() (cons x (get-list)))))
@@ -1117,6 +1118,43 @@
                 (loop)))))))))
 
 ;; ----------------------------------------------------------------------------
+;; configuration
+
+(defcommand-section "Configuration")
+
+(defcommand input "expeditor | readline | plain | default"
+  "configure the input mode for next startup"
+  ["Configures the input mode that xrepl uses on startup The options"
+   "are"
+   " * expeditor : supports language-specific navigation and indentation"
+   "               where the expression stream is separate from the"
+   "               current input port"
+   " * readline  : traditional line-editor input, where the line editor"
+   "               feeds into the current input port; uses the editline"
+   "               library by default, but install the \"readline-gpl\""
+   "                package to use the readline library"
+   " * plain     : reads from the current input port"
+   " * default   : tries the above in order"
+   "Plain mode is used if the selected mode is not available in the"
+   "current installation."]
+  (define mode (getarg 'sexpr))
+  (unless (memq mode '(expeditor readline plain default))
+    (error 'xrepl "not a regonized input mode: ~e" mode))
+  (put-preferences '(xrepl-input-mode) (list mode)))
+
+(define current-expeditor-color-enabled void)
+
+(defcommand color "on | off | yes | no | #true | #false"
+  "configure expeditor color mode"
+  ["Enables or disables color mode for expeditor."]
+  (define mode (getarg 'sexpr))
+  (unless (memq mode '(on off yes no #t #f))
+    (error 'xrepl "not a regonized color mode: ~e" mode))
+  (define on? (memq mode '(on yes #t)))
+  (put-preferences '(expeditor-color-enabled) (list on?))
+  (current-expeditor-color-enabled on?))
+
+;; ----------------------------------------------------------------------------
 ;; namespace switching
 
 (defcommand-section "Miscellaneous")
@@ -1588,15 +1626,20 @@
     (display prefix) (display "> ") (flush-output) (zero-column!)
     (let ([in ((current-get-interaction-input-port))])
       ((current-read-interaction) (object-name in) in)))
+  (define input-mode (get-preference 'xrepl-input-mode (lambda () #f)))
   (define expeditor-open ; no direct dependency on expeditor
-    (and (or (current-interaction-info)
+    (and (or (eq? input-mode 'expeditor)
+             (not input-mode))
+         (or (current-interaction-info)
              (default-current-read-interaction?))
          (with-handlers ([exn? (λ (_) #f)])
            (collection-file-path "main.rkt" "expeditor"))
          (dynamic-require 'expeditor 'expeditor-open (lambda () #f))))
   (define RL ; no direct dependency on readline
-    (with-handlers ([exn? (λ (_) #f)])
-      (collection-file-path "pread.rkt" "readline")))
+    (and (or (eq? input-mode 'readline)
+             (not input-mode))
+         (with-handlers ([exn? (λ (_) #f)])
+           (collection-file-path "pread.rkt" "readline"))))
   (define (make-readline-reader)
     (let ([p (dynamic-require RL 'current-prompt)]
           [r (dynamic-require RL 'read-cmdline-syntax)])
@@ -1623,7 +1666,9 @@
             (define expeditor-read (ex 'expeditor-read))
             (define expeditor-close (ex 'expeditor-close))
             (define current-expeditor-ready-checker (ex 'current-expeditor-ready-checker))
+            (set! current-expeditor-color-enabled (ex 'current-expeditor-color-enabled))
             (current-error-display (ex 'expeditor-error-display))
+            (current-newline-ends-command #f)
             ((ex 'expeditor-configure))
             (exit-handler
              (let ([old (exit-handler)])
@@ -1689,7 +1734,8 @@
        (values
         #t ;; commands are from input
         ;; reader:
-        (case (object-name (current-input-port))
+        (case (and (not (eq? input-mode 'plain))
+                   (object-name (current-input-port)))
           [(stdin)
            (if (or (not (terminal-port? (current-input-port)))
                    (eq? 'windows (system-type))

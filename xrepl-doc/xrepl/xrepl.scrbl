@@ -315,6 +315,16 @@ available.
 }
 
 @; ---------------------------------
+@subsection{Configuration Commands}
+
+@defcmd[input]{
+ Selects the input mode used next time that xrepl starts. The @litchar{default}
+ mode tries the other three in order.}
+
+@defcmd[color]{
+ Enables or disables color in expeditor mode.}
+
+@; ---------------------------------
 @subsection{Miscellaneous Commands}
 
 @defcmd[switch-namespace]{
