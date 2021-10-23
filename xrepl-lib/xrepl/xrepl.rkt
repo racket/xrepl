@@ -1140,7 +1140,7 @@
   (define mode (getarg 'sexpr))
   (unless (memq mode '(expeditor readline plain default))
     (error 'xrepl "not a regonized input mode: ~e" mode))
-  (put-preferences '(xrepl-input-mode) (list mode)))
+  (put-preferences '(xrepl-input-mode) (list (if (eq? mode 'default) #f mode))))
 
 (define current-expeditor-color-enabled void)
 
