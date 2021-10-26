@@ -1699,16 +1699,14 @@
                                              (loop)))
                                          (close-output-port o)
                                          (xrepl-command-and-argument-port cmd i)))]
+                                     [(eof-object? (peek-byte in)) eof]
                                      [else
-                                      (let loop ([first? #t])
+                                      (let loop ()
                                         (define v (orig name in))
                                         (cond
-                                          [(eof-object? v)
-                                           (if first?
-                                               v
-                                               null)]
+                                          [(eof-object? v) null]
                                           [else
-                                           (cons v (loop #f))]))])))]
+                                           (cons v (loop))]))])))]
                               [current-expeditor-ready-checker
                                (let ([orig (current-expeditor-ready-checker)])
                                  (lambda (in)
@@ -1728,7 +1726,7 @@
                  (cond
                    [(eof-object? v) v]
                    [(xrepl-command-and-argument-port? v) v]
-                   [(null? (cdr v)) (car v)]
+                   [(and (pair? v) (null? (cdr v))) (car v)]
                    [else (more-inputs* v)])))))]
       [else
        (values
