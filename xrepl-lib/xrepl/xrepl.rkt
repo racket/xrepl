@@ -1670,11 +1670,13 @@
             (current-error-display (ex 'expeditor-error-display))
             (current-newline-ends-command #f)
             ((ex 'expeditor-configure))
+            (define (save-history)
+              (define history (expeditor-close ee))
+              (put-preferences '(readline-input-history) (list (map string->bytes/utf-8 history))))
             (exit-handler
              (let ([old (exit-handler)])
                (lambda (v)
-                 (define history (expeditor-close ee))
-                 (put-preferences '(readline-input-history) (list (map string->bytes/utf-8 history)))
+                 (save-history)
                  (old v))))
             (values
              #f ; commands no from input
@@ -1699,7 +1701,9 @@
                                              (loop)))
                                          (close-output-port o)
                                          (xrepl-command-and-argument-port cmd i)))]
-                                     [(eof-object? (peek-byte in)) eof]
+                                     [(eof-object? (peek-byte in))
+                                      (save-history)
+                                      eof]
                                      [else
                                       (let loop ()
                                         (define v (orig name in))
