@@ -1667,7 +1667,15 @@
             (define expeditor-close (ex 'expeditor-close))
             (define current-expeditor-ready-checker (ex 'current-expeditor-ready-checker))
             (set! current-expeditor-color-enabled (ex 'current-expeditor-color-enabled))
-            (current-error-display (ex 'expeditor-error-display))
+            (current-error-display (let ([error-display (ex 'expeditor-error-display)]
+                                         [orig-stderr (current-error-port)])
+                                     (lambda (s)
+                                       (define stderr (current-error-port))
+                                       (cond
+                                         [(equal? orig-stderr stderr)
+                                          (error-display s)]
+                                         [else
+                                          (display s stderr)]))))
             (current-newline-ends-command #f)
             ((ex 'expeditor-configure))
             (define (save-history)
