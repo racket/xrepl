@@ -19,7 +19,9 @@
   XREPL is enabled by default when running @exec{racket} when the
   @racketmodname[xrepl] module is available. More specifically, XREPL
   is loaded via @racketmodname[racket/interactive], which is loaded by
-  default for a REPL is started. When the @racketmodname[expeditor
+  default when a REPL is started. 
+
+  When the @racketmodname[expeditor
   #:indirect] module is available and either
   @racket[current-interaction-info] is set to a vector or
   @racket[current-read-interaction] has its default value, then the
