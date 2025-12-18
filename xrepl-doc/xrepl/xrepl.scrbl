@@ -3,9 +3,7 @@
           scribble/decode (only-in scribble/core)
           (for-label racket readline racket/help racket/enter
                      racket/trace profile
-                     xrepl/xrepl
-                     macro-debugger/stepper-text
-                     macro-debugger/analysis/check-requires))
+                     xrepl/xrepl))
 
 @title{XREPL: eXtended REPL}
 @author[@author+email["Eli Barzilay" "eli@barzilay.org"]]
@@ -401,8 +399,9 @@ available.
   @item{@litchar{*} uses the macro debugger's textual output to show
     expansion steps for the current syntax, leaving macros from
     @racketmodname[racket/base] intact.  Does not change the current
-    syntax.  Uses @racket[expand/step-text], see @other-doc['(lib
-    "macro-debugger/macro-debugger.scrbl")] for details.}
+    syntax.  Uses @racketmodname[macro-debugger/stepper-text #:indirect],
+    see @other-doc['(lib "macro-debugger/macro-debugger.scrbl") #:indirect "Macro Stepper"]
+    for details.}
   @item{@litchar{**} uses the macro debugger similarly to @litchar{*},
     but expands @racketmodname[racket/base] macros too, showing the
     resulting full expansion process.}]
@@ -413,7 +412,7 @@ available.
 @defcmd[check-requires]{
   Uses @racket[show-requires] to analyze the @racket[require]s of the
   specified module, defaulting to the currently entered module if we're
-  in one.  See @other-doc['(lib "macro-debugger/macro-debugger.scrbl")]
+  in one.  See @other-doc['(lib "macro-debugger/macro-debugger.scrbl") #:indirect "Macro Stepper"]
   for details.
 }
 
